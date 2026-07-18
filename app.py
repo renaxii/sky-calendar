@@ -1,10 +1,16 @@
 import streamlit as st
 from datetime import date
 
+from utils.location import get_coordinates
+from utils.weather import get_weather
+from utils.sun import get_sun_times
+from utils.score import calculate_score
+
 st.set_page_config(
     page_title="sky calendar",
     page_icon="🌌",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 st.markdown("""
@@ -17,7 +23,10 @@ st.markdown("""
 
 #MainMenu {visibility:hidden;}
 footer {visibility:hidden;}
-header {visibility:hidden;}
+            
+[data-testid="stHeader"] {
+    background: transparent;
+}
 
 div[data-testid="stMetric"]{
     background:#15243D;
@@ -41,21 +50,46 @@ with st.sidebar:
     st.title("Settings")
 
     city = st.text_input(
-        "Location",
-        placeholder="City"
+        "location",
+        placeholder="city"
     )
 
     selected_date = st.date_input(
-        "Choose a date",
+        "choose a date",
         value=date.today()
     )
 
     units = st.selectbox(
-        "Units",
-        ["Metric", "Imperial"]
+        "units",
+        ["metric", "imperial"]
     )
 
-st.title("Sky Calendar")
+weather = None
+sun = None
+score = None
+
+if city:
+
+    lat, lon = get_coordinates(city)
+
+    weather = get_weather(
+        lat,
+        lon,
+        units
+    )
+
+    sun = get_sun_times(
+        city,
+        lat,
+        lon
+    )
+
+    score = calculate_score(
+        weather["clouds"],
+        weather["humidity"]
+    )
+
+st.title("sky calendar")
 st.caption("a dashboard for stargazers")
 
 st.divider()
@@ -64,16 +98,28 @@ st.divider()
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("Moon", "--")
+    st.metric("moon", "--")
 
 with col2:
-    st.metric("Cloud Cover", "--")
+    if weather:
+        st.metric(
+            "cloud cover",
+            f"{weather['clouds']}%"
+        )
+    else:
+        st.metric(
+            "cloud cover",
+            "--"
+        )
 
 with col3:
-    st.metric("Observing Score", "--")
+    if score is not None:
+        st.metric("observing score", f"{score}")
+    else:
+        st.metric("observing score", "--")
 
 with col4:
-    st.metric("ISS Pass", "--")
+    st.metric("ISS pass", "--")
 st.divider()
 
 # main layout
@@ -101,16 +147,34 @@ with right:
 
     with st.container(border=True):
         st.subheader("sun")
-        st.write("sunrise: --")
-        st.write("sunset: --")
+
+        if sun:
+            st.write(
+                f"sunrise: {sun['sunrise'].strftime('%I:%M %p')}"
+            )
+
+            st.write(
+                f"sunset: {sun['sunset'].strftime('%I:%M %p')}"
+            )
+
+        else:
+            st.write("sunrise: --")
+            st.write("sunset: --")
 
     st.write("")
 
     with st.container(border=True):
         st.subheader("weather")
-        st.write("temperature: --")
-        st.write("cloud cover: --")
-        st.write("humidity: --")
+        if weather:
+            unit = "F" if units == "imperial" else "C"
+
+            st.write(f"temperature: {weather['temperature']}{unit}")
+            st.write(f"cloud cover: {weather['clouds']}%")
+            st.write(f"humidity: {weather['humidity']}%")
+        else:
+            st.write("temperature: --")
+            st.write("cloud cover: --")
+            st.write("humidity: --")
 
     st.write("")
 
