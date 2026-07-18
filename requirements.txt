@@ -1,0 +1,7 @@
+streamlit
+requests
+skyfield
+astral
+pandas
+plotly
+pillow
