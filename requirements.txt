@@ -5,3 +5,5 @@ astral
 pandas
 plotly
 pillow
+timezonefinder
+streamlit-geolocation
