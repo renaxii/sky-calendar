@@ -1,16 +1,34 @@
-from geopy.geocoders import Nominatim
+import requests
 
 
-def get_coordinates(city):
+def search_locations(query):
 
-    geolocator = Nominatim(user_agent="stargaze")
+    url = "https://geocoding-api.open-meteo.com/v1/search"
 
-    location = geolocator.geocode(city)
+    params = {
+        "name": query,
+        "count": 5,
+        "language": "en",
+        "format": "json"
+    }
 
-    if location:
-        return (
-            location.latitude,
-            location.longitude
-        )
+    response = requests.get(
+        url,
+        params=params
+    )
 
-    return None, None
+    data = response.json()
+
+    results = []
+
+    for place in data.get("results", []):
+
+        results.append({
+            "name": place.get("name", ""),
+            "state": place.get("admin1", ""),
+            "country": place.get("country", ""),
+            "latitude": place.get("latitude"),
+            "longitude": place.get("longitude")
+        })
+
+    return results
