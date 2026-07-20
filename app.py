@@ -5,7 +5,9 @@ from utils.location import search_locations
 from utils.weather import get_weather
 from utils.sun import get_sun_times
 from utils.score import calculate_score
-
+from utils.nasa import get_apod
+from utils.moon import get_moon_phase
+from utils.planets import get_visible_planets
 
 st.set_page_config(
     page_title="sky calendar",
@@ -108,6 +110,9 @@ with st.sidebar:
 weather = None
 sun = None
 score = None
+apod = None
+moon = None
+planets = []
 
 if (
     st.session_state.lat is not None
@@ -132,6 +137,16 @@ if (
         weather["humidity"]
     )
 
+    apod = get_apod(selected_date)
+
+    moon = get_moon_phase(
+        selected_date
+    )
+
+    planets = get_visible_planets(
+        selected_date
+    )
+
 st.title("sky calendar")
 st.caption("a dashboard for stargazers")
 
@@ -141,6 +156,13 @@ st.divider()
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
+    if moon:
+
+        st.metric(
+            "moon",
+            moon["phase"]
+        )
+    else:
     st.metric(
         "moon",
         "--"
@@ -200,16 +222,49 @@ with left:
     with st.container(border=True):
         st.subheader("planets visible tonight")
         st.write(
-            "coming soon..."
+                if planets:
+
+                for planet in planets:
+                st.write(
+                    f"• {planet}"
+                    )
+                else:
+                    st.write(
+                        "no planets visible"
+                        )
         )
 
     st.write("")
 
     with st.container(border=True):
         st.subheader("NASA astronomy picture")
-        st.write(
-            "coming soon..."
-        )
+        if apod:
+            if apod.get("media_type") == "image":
+
+                st.image(
+                    apod["url"],
+                    use_container_width=True
+                )
+            elif apod.get("media_type") == "video":
+
+                st.video(
+                    apod["url"]
+                )
+            st.markdown(
+                f"**{apod['title']}**"
+            )
+            st.caption(
+                apod["date"]
+            )
+            with st.expander("description"):
+
+                st.write(
+                    apod["explanation"]
+                )
+        else:
+            st.write(
+                "unable to load NASA astronomy picture"
+            )
 
 with right:
 
