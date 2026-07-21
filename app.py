@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_searchbox import st_searchbox
 from datetime import date
 
 from utils.location import search_locations
@@ -40,8 +41,28 @@ div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stMarkdownContaine
     border-radius:18px;
 }
 
-h1{
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: "Inter", sans-serif;
+}
+
+h1 {
+    font-size: 3rem;
+    letter-spacing: -0.03em;
+    font-weight: 500;
+}
+
+h2, h3, h4, h5, h6,
+.stTitle,
+.stHeading {
+    font-family: "Outfit", sans-serif;
     color:white;
+    font-weight:600;
+}
+
+p, span, div {
+    font-family: "Inter", sans-serif;
 }
 
 </style>
@@ -61,41 +82,26 @@ if "location_name" not in st.session_state:
 with st.sidebar:
 
     st.title("settings")
-    city = st.text_input(
-        "search location",
-        placeholder="city name"
-    )
+    def location_search(query):
+        if not query:
+            return []
 
-    selected_location = None
+        locations = search_locations(query)
 
-    if city:
-
-        locations = search_locations(city)
-
-        if locations:
-
-            selected_location = st.selectbox(
-                "choose location",
-                locations,
-                format_func=lambda x:
-                    f"{x.get('name', '')}, {x.get('state', '')}, {x.get('country', '')}"
+        return [
+            (
+                f"{x.get('name', '')}, {x.get('state', '')}, {x.get('country', '')}",
+                x
             )
+            for x in locations
+        ]
 
-            if selected_location:
 
-                st.session_state.lat = selected_location["latitude"]
-                st.session_state.lon = selected_location["longitude"]
-
-                st.session_state.location_name = (
-                    f"{selected_location.get('name', '')}, "
-                    f"{selected_location.get('state', '')}, "
-                    f"{selected_location.get('country', '')}"
-                )
-
-    if st.session_state.location_name:
-        st.write(
-            f"using: {st.session_state.location_name}"
-        )
+    selected_location = st_searchbox(
+        location_search,
+        placeholder="search location",
+        key="location_search"
+    )
 
     selected_date = st.date_input(
         "choose a date",
@@ -107,6 +113,18 @@ with st.sidebar:
         ["metric", "imperial"]
     )
 
+if selected_location:
+
+    st.session_state.lat = selected_location["latitude"]
+    st.session_state.lon = selected_location["longitude"]
+
+    st.session_state.location_name = (
+        f"{selected_location.get('name', '')}, "
+        f"{selected_location.get('state', '')}, "
+        f"{selected_location.get('country', '')}"
+    )
+
+# prepare variables
 weather = None
 sun = None
 score = None
@@ -114,15 +132,22 @@ apod = None
 moon = None
 planets = []
 
-# Load APOD and moon regardless of location selection
+# always load APOD and moon phase (APOD does not depend on location)
+try:
+    selected_date
+except NameError:
+    selected_date = date.today()
+
+try:
+    units
+except NameError:
+    units = "metric"
+
 apod = get_apod(selected_date)
 moon = get_moon_phase(selected_date)
 
-if (
-    st.session_state.lat is not None
-    and st.session_state.lon is not None
-):
-    # Debug: log selected location and date
+# if we have a location, load weather, sun, score, planets
+if st.session_state.lat is not None and st.session_state.lon is not None:
     print(f"[DEBUG][app] selected location: {st.session_state.location_name}")
     print(f"[DEBUG][app] lat={st.session_state.lat} lon={st.session_state.lon} date={selected_date.isoformat()}")
 
@@ -140,8 +165,8 @@ if (
     )
 
     score = calculate_score(
-        weather["clouds"],
-        weather["humidity"]
+        weather.get("clouds", 0),
+        weather.get("humidity", 0)
     )
 
     planets = get_visible_planets(
@@ -155,57 +180,69 @@ st.caption("a dashboard for stargazers")
 
 st.divider()
 
-# top metrics
+# top summary cards
 col1, col2, col3, col4 = st.columns(4)
 
+card_style = """
+background:#15243D;
+border-radius:18px;
+padding:16px;
+text-align:center;
+color:white;
+display:flex;
+align-items:center;
+justify-content:center;
+"""
+
+
+def load_icon(name: str) -> str:
+    path = f"assets/icons/{name}.svg"
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return ""
+
 with col1:
-    if moon:
-
-        st.metric(
-            "moon",
-            moon.get("phase", "--")
+    with st.container():
+        title = "moon"
+        phase = moon.get("phase") if moon else None
+        svg = load_icon("moon")
+        value = phase or "--"
+        st.markdown(
+            f"<div style='{card_style} height:105px; display:flex; flex-direction:column; align-items:center; justify-content:center;'><div style='font-size:11px;text-transform:lowercase;margin-bottom:6px'>{title}</div><div style='color:inherit'>{svg}</div><div style='font-size:12px;margin-top:6px;white-space:normal;max-width:120px'>{value}</div></div>",
+            unsafe_allow_html=True,
         )
-    else:
-        st.metric(
-            "moon",
-            "--"
-        )
-
 
 with col2:
-
-    if weather:
-        st.metric(
-            "cloud cover",
-            f"{weather['clouds']}%"
+    with st.container():
+        title = "cloud cover"
+        value = f"{weather['clouds']}%" if weather else "--"
+        svg = load_icon("cloud")
+        st.markdown(
+            f"<div style='{card_style} height:105px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white;'><div style='font-size:11px;text-transform:lowercase;margin-bottom:6px'>{title}</div><div style='color:inherit'>{svg}</div><div style='font-size:14px;margin-top:6px'>{value}</div></div>",
+            unsafe_allow_html=True,
         )
-    else:
-        st.metric(
-            "cloud cover",
-            "--"
-        )
-
 
 with col3:
-
-    if score is not None:
-        st.metric(
-            "observing score",
-            f"{score}"
+    with st.container():
+        title = "observing score"
+        value = f"{score}/100" if score is not None else "--"
+        svg = load_icon("telescope")
+        st.markdown(
+            f"<div style='{card_style} height:105px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white;'><div style='font-size:11px;text-transform:lowercase;margin-bottom:6px'>{title}</div><div style='color:inherit'>{svg}</div><div style='font-size:14px;margin-top:6px'>{value}</div></div>",
+            unsafe_allow_html=True,
         )
-
-    else:
-        st.metric(
-            "observing score",
-            "--"
-        )
-
 
 with col4:
-    st.metric(
-        "ISS pass",
-        "--"
-    )
+    with st.container():
+        title = "iss pass"
+        value = "--"
+        svg = load_icon("drone")
+        st.markdown(
+            f"<div style='{card_style} height:105px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white;'><div style='font-size:11px;text-transform:lowercase;margin-bottom:6px'>{title}</div><div style='color:inherit'>{svg}</div><div style='font-size:12px;margin-top:6px'>{value}</div></div>",
+            unsafe_allow_html=True,
+        )
 
 st.divider()
 
@@ -225,7 +262,6 @@ with left:
     with st.container(border=True):
         st.subheader("planets visible tonight")
         if planets:
-            # planets may be None on API failure
             if isinstance(planets, list) and planets:
                 for planet in planets:
                     st.write(f"• {planet}")
@@ -295,7 +331,7 @@ with right:
         if weather:
             unit = "F" if units == "imperial" else "C"
             st.write(
-                f"temperature: {weather['temperature']}{unit}"
+                f"temperature: {weather['temperature']}° {unit}"
             )
             st.write(
                 f"cloud cover: {weather['clouds']}%"
