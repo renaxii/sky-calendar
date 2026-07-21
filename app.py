@@ -114,10 +114,17 @@ apod = None
 moon = None
 planets = []
 
+# Load APOD and moon regardless of location selection
+apod = get_apod(selected_date)
+moon = get_moon_phase(selected_date)
+
 if (
     st.session_state.lat is not None
     and st.session_state.lon is not None
 ):
+    # Debug: log selected location and date
+    print(f"[DEBUG][app] selected location: {st.session_state.location_name}")
+    print(f"[DEBUG][app] lat={st.session_state.lat} lon={st.session_state.lon} date={selected_date.isoformat()}")
 
     weather = get_weather(
         st.session_state.lat,
@@ -137,13 +144,9 @@ if (
         weather["humidity"]
     )
 
-    apod = get_apod(selected_date)
-
-    moon = get_moon_phase(
-        selected_date
-    )
-
     planets = get_visible_planets(
+        st.session_state.lat,
+        st.session_state.lon,
         selected_date
     )
 
@@ -160,13 +163,13 @@ with col1:
 
         st.metric(
             "moon",
-            moon["phase"]
+            moon.get("phase", "--")
         )
     else:
-    st.metric(
-        "moon",
-        "--"
-    )
+        st.metric(
+            "moon",
+            "--"
+        )
 
 
 with col2:
@@ -221,18 +224,15 @@ with left:
 
     with st.container(border=True):
         st.subheader("planets visible tonight")
-        st.write(
-                if planets:
-
+        if planets:
+            # planets may be None on API failure
+            if isinstance(planets, list) and planets:
                 for planet in planets:
-                st.write(
-                    f"• {planet}"
-                    )
-                else:
-                    st.write(
-                        "no planets visible"
-                        )
-        )
+                    st.write(f"• {planet}")
+            else:
+                st.write("no planets visible")
+        else:
+            st.write("no planets visible")
 
     st.write("")
 
